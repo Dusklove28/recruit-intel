@@ -55,7 +55,8 @@ def extract_record(
         if attempt:
             system += (
                 "\n上一次输出未通过严格校验。请重新输出全部17字段；"
-                "尤其把‘专业/硬性要求’压缩为180字以内的概括，不要逐岗位罗列。"
+                "尤其把‘专业/硬性要求’压缩为180字以内的概括，不要逐岗位罗列；"
+                "不要写入职后的培养或跟岗安排，保留特定专业的附加条件。"
             )
         response = client.complete_json(system, prompt)
         try:

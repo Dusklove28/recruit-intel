@@ -2,6 +2,7 @@
 
 import argparse
 from contextlib import closing
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import sys
@@ -10,9 +11,10 @@ from urllib.parse import urljoin
 import requests
 
 from collectors.campaign import explore_campaign
+from collectors.ccb import collect_ccb_campaign, create_ccb_session, is_ccb_announcement
 from collectors.generic import download_attachment
 from collectors.public_jobs import collect_structured_jobs
-from config import Settings
+from config import PROJECT_ROOT, Settings
 from exporters.excel_exporter import export_excel
 from extractor.llm_extractor import QwenClient, extract_record
 from extractor.schema import RecruitmentRecord
@@ -40,11 +42,22 @@ def parse_attachment(path: Path) -> tuple[str, bool]:
 
 
 def run(source_url: str, settings: Settings | None = None) -> None:
+    ccb_acceptance = is_ccb_announcement(source_url)
     settings = settings or Settings.from_env()
+    if ccb_acceptance and (
+        settings.database_path == PROJECT_ROOT / "data" / "recruitment.sqlite3"
+        or settings.output_path == PROJECT_ROOT / "data" / "output" / "2027届央国企事业编招聘汇总.xlsx"
+    ):
+        settings = replace(
+            settings,
+            database_path=PROJECT_ROOT / "data" / "cache" / "ccb_acceptance.sqlite3",
+            attachments_dir=PROJECT_ROOT / "data" / "attachments" / "ccb_acceptance",
+            output_path=PROJECT_ROOT / "data" / "cache" / "ccb_acceptance.xlsx",
+        )
     checked_on = datetime.now(CHINA_TIME).date()
-    session = requests.Session()
+    session = create_ccb_session() if ccb_acceptance else requests.Session()
     print("开始解析……")
-    campaign = explore_campaign(source_url, session)
+    campaign = collect_ccb_campaign(source_url, session) if ccb_acceptance else explore_campaign(source_url, session)
     official_url = campaign.pages[0].final_url
     print(f"已读取招聘专题页面 {len(campaign.pages)} 个")
     print(f"发现附件 {len(campaign.attachments)} 个")

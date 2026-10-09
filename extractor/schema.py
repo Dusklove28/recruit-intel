@@ -53,6 +53,8 @@ class RecruitmentRecord(BaseModel):
     def avoid_unverified_population_claims(cls, value):
         if value and re.search(r"多数岗位|大部分岗位|绝大多数岗位|所有岗位|全部岗位|均要求|普遍要求", value):
             raise ValueError("专业汇总不得使用未经逐岗核实的整体数量判断")
+        if value and re.search(r"跟岗锻炼|培养锻炼", value):
+            raise ValueError("专业/硬性要求不得混入入职后的培养安排")
         return value
 
 

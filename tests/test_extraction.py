@@ -125,3 +125,17 @@ def test_unsupported_population_claim_is_rejected():
     payload["专业/硬性要求"] = "多数岗位专业不限"
     with pytest.raises(ValidationError):
         RecruitmentRecord.model_validate(payload)
+
+
+def test_requirements_reject_training_as_qualification_and_keep_major_condition():
+    from processing.validate import finalize_record
+
+    payload = sample_payload()
+    payload["专业/硬性要求"] = "英语六级或专八；部分岗位涉及跟岗锻炼"
+    source = "英语专业毕业生须通过国家英语专业八级考试（不低于60分）。"
+    with pytest.raises(ValidationError):
+        finalize_record(payload, "https://example.com/notice", source, [], date(2026, 10, 9))
+
+    payload["专业/硬性要求"] = "英语六级≥425；英语专业毕业生另须专八≥60"
+    record = finalize_record(payload, "https://example.com/notice", source, [], date(2026, 10, 9))
+    assert "英语专业" in record.requirements

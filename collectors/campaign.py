@@ -1,7 +1,7 @@
 """Explore only relevant pages within the input announcement's campaign directory."""
 
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 import re
 from urllib.parse import urldefrag, urljoin, urlparse
@@ -34,6 +34,8 @@ class CampaignBundle:
     attachments: list[AttachmentLink]
     application_candidates: list[ApplicationCandidate]
     warnings: list[str]
+    content_evidence_urls: list[str] = field(default_factory=list)
+    attachment_evidence_fields: tuple[str, ...] | None = None
 
 
 def campaign_prefix(url: str) -> tuple[str, str]:

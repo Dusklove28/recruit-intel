@@ -13,6 +13,17 @@ def build_field_evidence(
     organization: OrganizationMatch | None = None,
 ) -> dict[str, list[str]]:
     source = bundle.pages[0].final_url
+    content_sources = [source, *bundle.content_evidence_urls]
+    attachment_sources = [item.url for item in bundle.attachments]
+    attachment_fields = (
+        {"招聘岗位", "招聘对象", "学历要求", "专业/硬性要求", "工作地点"}
+        if bundle.attachment_evidence_fields is None
+        else set(bundle.attachment_evidence_fields)
+    )
+
+    def material_sources(field: str) -> list[str]:
+        return content_sources + (attachment_sources if field in attachment_fields else [])
+
     job_urls = [jobs.campaign_page_url, jobs.listing_url] if jobs else [source]
     detail_urls = [jobs.campaign_page_url, jobs.detail_api_url] if jobs else [source]
     application_source = (
@@ -20,18 +31,18 @@ def build_field_evidence(
     )
     roles = {
         "序号": [source],
-        "单位名称": [source],
+        "单位名称": content_sources,
         "单位类型": list(organization.type_evidence) if organization else [],
         "所属集团/主管单位": list(organization.parent_evidence) if organization else [],
-        "招聘批次": [source],
-        "招聘岗位": [source, *job_urls] if jobs else [source],
-        "招聘对象": [source],
-        "学历要求": job_urls,
-        "专业/硬性要求": detail_urls,
-        "工作地点": job_urls,
+        "招聘批次": content_sources,
+        "招聘岗位": [*material_sources("招聘岗位"), *job_urls],
+        "招聘对象": material_sources("招聘对象"),
+        "学历要求": [*material_sources("学历要求"), *job_urls],
+        "专业/硬性要求": [*material_sources("专业/硬性要求"), *detail_urls],
+        "工作地点": [*material_sources("工作地点"), *job_urls],
         "更新时间": [],  # Internally managed content date, not an announcement date.
-        "截止时间": [source],
-        "招聘状态": [source],
+        "截止时间": content_sources,
+        "招聘状态": content_sources,
         "官方公告": [source],
         "报名入口": [application_source],
         "最后核验日期": [source],

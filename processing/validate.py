@@ -57,6 +57,11 @@ def finalize_record(
     record = RecruitmentRecord.model_validate(data)
     if not record.unit_name:
         raise ValueError("未能从公告确认单位名称，拒绝保存")
+    if re.search(r"英语专业毕业生须.{0,30}专业八级", source_text, re.S):
+        if not record.requirements or not re.search(
+            r"英语专业.{0,20}(?:专八|专业八级)", record.requirements
+        ):
+            raise ValueError("英语专业的专八附加条件未正确保留")
     if record.deadline:
         if record.deadline < checked_on:
             status = "已截止"

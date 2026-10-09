@@ -50,6 +50,18 @@ def test_plain_text_url_next_to_official_application_instruction():
     assert _application_candidates([page])[0].url == "https://jobs.company.example/"
 
 
+def test_explicit_json_apply_url_is_evidence_but_job_list_is_not():
+    page = Announcement(
+        "https://company.example/campus/2027.html", "https://company.example/campus/2027.html",
+        "2027届校园招聘 岗位列表", [HTMLLink("jobs.html", "招聘岗位")], [],
+        '<script type="application/json">{"jobsUrl":"/campus/jobs.html",'
+        '"applyUrl":"https://apply.example/2027"}</script>',
+    )
+    candidates = _application_candidates([page])
+    assert [item.url for item in candidates] == ["https://apply.example/2027"]
+    assert candidates[0].evidence_url == page.final_url
+
+
 def test_query_keyed_notice_does_not_follow_sibling_campaigns(monkeypatch):
     import collectors.campaign as campaign
 

@@ -13,6 +13,7 @@ def test_only_open_2027_enterprise_campus_campaigns_are_exported():
         "招聘对象": "2027届应届毕业生",
         "招聘状态": "招聘中",
         "截止时间": "2026-10-28",
+        "官方公告": "https://example.com/notice",
     })
     record = RecruitmentRecord.model_validate(payload)
     today = date(2026, 10, 9)
@@ -22,4 +23,6 @@ def test_only_open_2027_enterprise_campus_campaigns_are_exported():
     assert not is_product_record(record.model_copy(update={"batch": "2026届校园招聘", "audience": None}), today)
     assert not is_product_record(record.model_copy(update={"batch": "2027届社会招聘", "audience": None}), today)
     assert not is_product_record(record.model_copy(update={"status": "已截止"}), today)
+    assert not is_product_record(record.model_copy(update={"application_url": None}), today)
+    assert not is_product_record(record.model_copy(update={"official_url": None}), today)
     assert not is_product_record(record.model_copy(update={"deadline": date(2026, 10, 8)}), today)

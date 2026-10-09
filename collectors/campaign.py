@@ -9,22 +9,15 @@ from urllib.parse import parse_qs, urldefrag, urljoin, urlparse
 import requests
 
 from collectors.generic import Announcement, AttachmentLink, fetch_announcement
+from processing.evidence_resolver import ApplicationEvidence, resolve_application_candidates
 
 
 MAX_CAMPAIGN_PAGES = 15
 RELEVANT = re.compile(r"招聘|岗位|职位|投递|报名|网申|简章|指引|关于我们|申请", re.I)
 RELEVANT_PATH = re.compile(r"(?:index|brochure|campus|position|job|post|detail|zhiyin|apply)", re.I)
-APPLICATION = re.compile(r"报名|网申|立即投递|在线投递|投递入口|立即申请|进入系统|申请职位", re.I)
-GUIDE_PATH = re.compile(r"zhiyin|guide|apply|registration|signup", re.I)
-WEB_URL = re.compile(r"https?://[A-Za-z0-9./?&=%_#~+:-]+", re.I)
-SCRIPT_OPEN = re.compile(r"window\.open\(\s*['\"](https?://[^'\"]+)['\"]", re.I)
 
 
-@dataclass(frozen=True)
-class ApplicationCandidate:
-    url: str
-    evidence_url: str
-    priority: int
+ApplicationCandidate = ApplicationEvidence
 
 
 @dataclass(frozen=True)
@@ -63,30 +56,7 @@ def _is_relevant_page(url: str, label: str) -> bool:
 
 
 def _application_candidates(pages: list[Announcement]) -> list[ApplicationCandidate]:
-    candidates: list[ApplicationCandidate] = []
-    for page in pages:
-        guide = bool(
-            GUIDE_PATH.search(urlparse(page.final_url).path)
-            or re.search(r"官方网申平台|报名入口|网申入口", page.text)
-        )
-        if guide:
-            for url in SCRIPT_OPEN.findall(page.html):
-                candidates.append(ApplicationCandidate(url, page.final_url, 0))
-        for match in WEB_URL.finditer(page.text):
-            context = page.text[max(0, match.start() - 90):match.end() + 25]
-            if re.search(r"报名|网申|投递|招聘平台|登录网址", context):
-                candidates.append(ApplicationCandidate(match.group().rstrip(".)]）"), page.final_url, 2))
-        for link in page.links:
-            if APPLICATION.search(link.text):
-                candidates.append(
-                    ApplicationCandidate(urljoin(page.final_url, link.href), page.final_url, 1 if guide else 3)
-                )
-    deduplicated: dict[str, ApplicationCandidate] = {}
-    for item in sorted(candidates, key=lambda item: item.priority):
-        parsed = urlparse(item.url)
-        if parsed.scheme in {"http", "https"} and parsed.netloc:
-            deduplicated.setdefault(item.url, item)
-    return list(deduplicated.values())
+    return resolve_application_candidates(pages)
 
 
 def explore_campaign(source_url: str, session: requests.Session | None = None) -> CampaignBundle:

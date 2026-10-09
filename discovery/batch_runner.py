@@ -80,7 +80,9 @@ class BatchReport:
             "unsupported_platform": statuses["unsupported_platform"],
             "parse_failed": statuses["parse_failed"],
             "parse_rate": round(parsed / discovered, 3) if discovered else 0.0,
+            "discovery_rate": round(sum(item.discovered > 0 for item in self.results) / self.seed_total, 3) if self.seed_total else 0.0,
             "formal_inclusion_rate": round(n / discovered, 3) if discovered else 0.0,
+            "pending_rate": round(statuses["pending_manual_review"] / self.seed_total, 3) if self.seed_total else 0.0,
             "education_rate": round(sum(bool(r.education) for r in records) / n, 3) if n else 0.0,
             "requirements_rate": round(sum(bool(r.requirements) for r in records) / n, 3) if n else 0.0,
             "official_url_rate": round(sum(bool(r.official_url) for r in records) / n, 3) if n else 0.0,
@@ -93,7 +95,11 @@ def _save_lead_candidate(connection, seed: Seed, lead: CampaignLead) -> None:
 
 
 def _has_formal_record(connection, url: str) -> bool:
-    return connection.execute("SELECT 1 FROM recruitment WHERE source_url=?", (url,)).fetchone() is not None
+    return (
+        connection.execute("SELECT state FROM candidates WHERE notice_url=?", (url,)).fetchone() or [None]
+    )[0] == "正式收录" and connection.execute(
+        "SELECT 1 FROM recruitment WHERE source_url=?", (url,)
+    ).fetchone() is not None
 
 
 def _allowed_lead(seed: Seed, lead: CampaignLead) -> bool:
@@ -107,6 +113,20 @@ def _process_seed(seed: Seed, settings: Settings, connection, *, sleep_seconds: 
     platform = detect_platform(seed.career_url, official_domain=seed.official_domain)
     result = SeedResult(seed.organization_name, seed.career_url, platform, "pending_manual_review")
     if platform not in SUPPORTED:
+        try:
+            public_get(requests.Session(), seed.career_url)
+            result.accessible = True
+        except AccessRestricted as error:
+            result.status = "access_control"
+            result.reason = str(error)
+            result.failed_url = error.url
+            result.http_status = error.status_code
+            return result
+        except requests.RequestException as error:
+            result.status = "parse_failed"
+            result.reason = f"{type(error).__name__}：入口读取失败"
+            result.failed_url = seed.career_url
+            return result
         result.status = "unsupported_platform"
         result.reason = f"{platform} 平台尚无首批 Adapter"
         return result
@@ -233,7 +253,17 @@ def run_batch(
             if sleep_seconds:
                 time.sleep(sleep_seconds)
         today = datetime.now(CHINA_TIME).date()
-        records = [record for record in list_records(connection) if is_product_record(record, today)]
+        source_by_official = {
+            row["official_url"]: row["source_url"]
+            for row in connection.execute("SELECT source_url,official_url FROM recruitment")
+        }
+        records = [
+            record for record in list_records(connection)
+            if is_product_record(record, today) and not connection.execute(
+                "SELECT 1 FROM candidates WHERE notice_url=? AND state<>?",
+                (source_by_official.get(record.official_url, record.official_url), "正式收录"),
+            ).fetchone()
+        ]
         formal_urls = {url for item in report.results for url in item.formal_urls}
         report.formal_records = [
             RecruitmentRecord.model_validate({name: row[name] for name in RecruitmentRecord.model_fields})

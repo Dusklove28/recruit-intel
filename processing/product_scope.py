@@ -19,6 +19,8 @@ def is_product_record(record: RecruitmentRecord, on_date: date) -> bool:
         return False
     if record.status not in {"招聘中", "即将截止"}:
         return False
+    if not record.official_url or not record.application_url:
+        return False
     if record.deadline is not None and record.deadline < on_date:
         return False
     return True

@@ -1,0 +1,34 @@
+[
+  {
+    "organization_name": "中能建建筑集团有限公司",
+    "parent_group": "中国能源建设集团有限公司",
+    "relationship_url": "http://www.aepc1.ceec.net.cn/col/col14569/index.html",
+    "group_chain_url": "http://group.ceec.net.cn/",
+    "verified_at": "2026-10-09",
+    "note": "企业简介称2011年加入中国能建、现为其旗下建筑板块集团直管企业；集团官方首页列出集团全称。"
+  },
+  {
+    "organization_name": "中车长春轨道客车股份有限公司",
+    "parent_group": "中国中车集团有限公司",
+    "relationship_url": "https://www.crrcgc.cc/crrcgc/71_4829/71_5083/index.html",
+    "group_chain_url": "https://www.crrcgc.cc/Portals/71/Uploads/Files/2023/4-13/638169762847931967.pdf",
+    "verified_at": "2026-10-09",
+    "note": "中国中车股份公司成员企业名单列明该公司；股份公司官方年报列明控股股东为中国中车集团有限公司。"
+  },
+  {
+    "organization_name": "中车洛阳机车有限公司",
+    "parent_group": "中国中车集团有限公司",
+    "relationship_url": "https://www.crrcgc.cc/crrcgc/71_4829/71_5083/index.html",
+    "group_chain_url": "https://www.crrcgc.cc/Portals/71/Uploads/Files/2023/4-13/638169762847931967.pdf",
+    "verified_at": "2026-10-09",
+    "note": "中国中车股份公司成员企业名单列明该公司；股份公司官方年报列明控股股东为中国中车集团有限公司。"
+  },
+  {
+    "organization_name": "中铁投资集团有限公司",
+    "parent_group": "中国铁路工程集团有限公司",
+    "relationship_url": "https://www.crecg.com/zttzjt/jtgk/fzlc/index.html",
+    "group_chain_url": "https://www.crecg.com/web/attachDir/2026/04/2026042408462964468.pdf",
+    "verified_at": "2026-10-09",
+    "note": "公司官网称其为中国中铁股份有限公司全资子公司；股份公司官方年报列明中国铁路工程集团有限公司为控股股东。"
+  }
+]

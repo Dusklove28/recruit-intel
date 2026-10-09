@@ -7,6 +7,7 @@ deliberately a curated registry, not a guess from a name or a site crawler.
 from dataclasses import dataclass
 from functools import lru_cache
 import json
+from pathlib import Path
 import re
 import sqlite3
 from urllib.parse import urlparse
@@ -46,10 +47,44 @@ REGISTRY = {
     ),
 }
 
+RELATIONSHIP_FILE = Path(__file__).with_name("organization_relations.json")
+
+
+def lookup_verified_child(seed: Seed) -> OrganizationMatch | None:
+    """Use exact, dated, official ownership-chain evidence curated on demand."""
+    if not RELATIONSHIP_FILE.exists():
+        return None
+    relationships = json.loads(RELATIONSHIP_FILE.read_text(encoding="utf-8"))
+    for entry in relationships:
+        if entry["organization_name"] != seed.organization_name:
+            continue
+        group = entry["parent_group"]
+        if seed.organization_type != "央企子公司" or seed.parent_group != group or not entry.get("verified_at"):
+            return None
+        domain = seed.official_domain.lower().lstrip(".")
+        sources = (entry["relationship_url"], entry["group_chain_url"])
+        if any(
+            (urlparse(url).hostname or "").lower() != domain
+            and not (urlparse(url).hostname or "").lower().endswith("." + domain)
+            for url in sources
+        ):
+            return None
+        if group not in central_enterprise_names():
+            return None
+        return OrganizationMatch("央企子公司", group,
+                                 (*sources, SASAC_CENTRAL_ENTERPRISES_URL), sources)
+    return None
+
 
 def lookup_organization(official_name: str | None) -> OrganizationMatch | None:
     """Only exact, preverified official names may populate organization fields."""
     return REGISTRY.get(official_name.strip()) if official_name else None
+
+
+def seed_name_supported_by_notice(extracted_name: str | None, official_name: str, material: str) -> bool:
+    """Replace a shortened employer name only when its exact legal name is in the fetched notice."""
+    return bool(extracted_name and extracted_name != official_name
+                and extracted_name in official_name and official_name in material)
 
 
 @lru_cache(maxsize=1)
@@ -89,6 +124,9 @@ def verify_child_seed(seed: Seed) -> OrganizationMatch | None:
     """Use an official company page with an explicit exact-name parent relation."""
     if seed.organization_type != "央企子公司" or not seed.parent_group:
         return None
+    curated = lookup_verified_child(seed)
+    if curated:
+        return curated
     source_host = (urlparse(seed.source).hostname or "").lower()
     official_domain = seed.official_domain.lower().lstrip(".")
     if source_host != official_domain and not source_host.endswith("." + official_domain):

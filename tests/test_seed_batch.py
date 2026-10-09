@@ -1,27 +1,35 @@
 """Small offline checks for the new bounded discovery layer."""
 
 import sqlite3
+from openpyxl import load_workbook
 
 from adapters.base import AccessRestricted, CampaignLead, DiscoveryOutcome, public_get
 from adapters.beisen import BeisenAdapter
 from adapters.generic import _cohort_evidence
+from collectors.discovery import Candidate
 from collectors.generic import Announcement
 from config import Settings
 from discovery.batch_runner import run_batch
 from discovery.platform_detector import detect_platform
 from discovery.seed_registry import Seed, STATUSES, load_seeds
+from discovery.search_provider import MockSearchProvider, CandidateURL, rank_candidate, search_queries
 from discovery.structured_records import beisen_draft, save_draft
-from processing.organization_registry import verify_child_seed
+from extractor.schema import RecruitmentRecord
+from main import record_candidate_state
+from processing.organization_registry import lookup_verified_child, seed_name_supported_by_notice, verify_child_seed
+from storage.candidates import save_candidates, update_candidate
+from storage.database import connect_database, save_record
+from test_extraction import sample_payload
 
 
 def _seed(name: str, url: str) -> Seed:
     return Seed(name, "央企", "国务院国资委", url, "example.cn", "custom", url, None)
 
 
-def test_20_independent_seeds_and_platform_detection():
+def test_50_independent_seeds_and_platform_detection():
     seeds = load_seeds()
-    assert len(seeds) == 20
-    assert len({seed.career_url for seed in seeds}) == 20
+    assert len(seeds) == 50
+    assert len({seed.career_url for seed in seeds}) == 50
     assert detect_platform("https://a.zhiye.com/campus/jobs") == "beisen"
     assert detect_platform("https://campus.51job.com/cofco/") == "51job_campus"
     assert detect_platform("https://job.example.cn/", official_domain="example.cn") == "custom"
@@ -29,6 +37,71 @@ def test_20_independent_seeds_and_platform_detection():
     assert _cohort_evidence("2027年度高校毕业生统招公告")
     assert not _cohort_evidence("2026年社会招聘公告")
     assert "access_control" in STATUSES
+
+
+def test_search_fallback_is_only_an_interface():
+    query = search_queries("中国大唐集团有限公司", "china-cdt.com")[0]
+    result = CandidateURL("https://zhaopin.china-cdt.com/", "招聘", "mock", 100)
+    assert MockSearchProvider({query: [result]}).search(query) == [result]
+    assert rank_candidate(result.url, "china-cdt.com") > rank_candidate("https://example.com/notice", "china-cdt.com")
+
+
+def test_curated_child_relation_requires_exact_official_chain(monkeypatch):
+    seed = next(s for s in load_seeds() if s.organization_name == "中铁投资集团有限公司")
+    monkeypatch.setattr("processing.organization_registry.central_enterprise_names", lambda: frozenset({"中国铁路工程集团有限公司"}))
+    match = lookup_verified_child(seed)
+    assert match is not None
+    assert match.parent_unit == "中国铁路工程集团有限公司"
+    assert len(match.parent_evidence) == 2
+    assert lookup_verified_child(Seed("不相关公司", seed.organization_type, seed.parent_group,
+                                      seed.career_url, seed.official_domain, seed.platform, seed.source, seed.verified_at)) is None
+
+
+def test_abbreviated_name_needs_exact_legal_name_in_notice():
+    official = "中国电力工程顾问集团中南电力设计院有限公司"
+    assert seed_name_supported_by_notice("中南电力设计院有限公司", official, f"{official}2027届校园招聘")
+    assert not seed_name_supported_by_notice("其他公司有限公司", official, f"{official}2027届校园招聘")
+    assert not seed_name_supported_by_notice("中南电力设计院有限公司", official, "集团其他企业招聘")
+
+
+def test_pending_candidate_retains_extracted_fields_and_evidence(tmp_path):
+    settings = Settings("unused", "https://unused.example", "unused", tmp_path / "local.sqlite3",
+                        tmp_path / "attachments", tmp_path / "out.xlsx")
+    record = RecruitmentRecord.model_validate(sample_payload())
+    notice = "https://official.example/notice/2027.html"
+    record_candidate_state(settings, notice, notice, record, "待核验", "报名入口未证实",
+                           {"学历要求": [notice]})
+    with sqlite3.connect(settings.database_path) as connection:
+        draft = connection.execute(
+            "SELECT record_json,evidence_json FROM candidate_structured_records WHERE campaign_url=?", (notice,)
+        ).fetchone()
+        assert draft is not None
+        assert '"学历要求"' in draft[1]
+        assert '"education"' in draft[0]
+
+
+def test_old_formal_row_is_not_counted_or_exported_after_pending_recheck(tmp_path, monkeypatch):
+    notice = "https://jobs.example.cn/campus/2027.html"
+    seed = _seed("测试集团", "https://jobs.example.cn/campus/index.html")
+    settings = Settings("unused", "https://unused.example", "unused", tmp_path / "local.sqlite3",
+                        tmp_path / "attachments", tmp_path / "out.xlsx")
+    payload = sample_payload()
+    payload.update({"单位类型": "央企", "招聘批次": "2027届校园招聘", "招聘对象": "2027届应届毕业生",
+                    "官方公告": notice, "报名入口": "https://jobs.example.cn/apply", "招聘状态": "招聘中"})
+    record = RecruitmentRecord.model_validate(payload)
+    with connect_database(settings.database_path) as connection:
+        save_record(connection, notice, record, "旧正文")
+        save_candidates(connection, [Candidate("企业招聘入口", seed.career_url, "2027届校招", notice)])
+        update_candidate(connection, notice, "待核验", reason="本次报名入口未证实")
+    lead = CampaignLead(notice, "2027届校园招聘", seed.career_url, "2027届校园招聘")
+    monkeypatch.setattr("discovery.batch_runner.GenericAdapter.discover",
+                        lambda self, current: DiscoveryOutcome(current, "custom", True, [lead]))
+    monkeypatch.setattr("discovery.batch_runner.public_get", lambda *args: object())
+    monkeypatch.setattr("discovery.batch_runner.run", lambda *args, **kwargs: record)
+    report, output = run_batch(settings, [seed], sleep_seconds=0)
+    assert report.summary()["formal_campaigns"] == 0
+    assert report.results[0].status == "pending_manual_review"
+    assert load_workbook(output).active.max_row == 1
 
 
 def test_access_control_is_recorded_and_next_seed_continues(tmp_path, monkeypatch):

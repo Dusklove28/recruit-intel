@@ -10,13 +10,14 @@ from urllib.parse import urljoin
 
 import requests
 
-from adapters.base import AccessRestricted, HEADERS
+from adapters.base import AccessRestricted, CampaignLead, HEADERS
 from collectors.campaign import explore_campaign
 from collectors.ccb import collect_ccb_campaign, create_ccb_session, is_ccb_announcement
 from collectors.discovery import Candidate
 from collectors.generic import download_attachment
 from collectors.public_jobs import collect_structured_jobs
 from config import PRODUCT_OUTPUT_PATH, PROJECT_ROOT, Settings
+from discovery.structured_records import save_draft
 from exporters.excel_exporter import export_excel
 from extractor.llm_extractor import QwenClient, extract_record
 from extractor.schema import RecruitmentRecord
@@ -25,7 +26,8 @@ from parsers.excel_parser import parse_excel
 from parsers.pdf_parser import parse_pdf
 from processing.evidence import build_field_evidence
 from processing.organization_registry import (
-    OrganizationMatch, lookup_organization, save_verified_organization, verify_central_group,
+    OrganizationMatch, lookup_organization, save_verified_organization, seed_name_supported_by_notice,
+    verify_central_group,
 )
 from processing.product_scope import is_product_record
 from storage.database import connect_database, list_records, save_record
@@ -38,6 +40,7 @@ CHINA_TIME = timezone(timedelta(hours=8))
 def record_candidate_state(
     settings: Settings, candidate_url: str, official_url: str,
     record: RecruitmentRecord, state: str, reason: str | None = None,
+    evidence: dict[str, list[str]] | None = None,
 ) -> None:
     with closing(connect_database(settings.database_path)) as database:
         title = " ".join(part for part in (record.unit_name, record.batch) if part) or official_url
@@ -45,6 +48,11 @@ def record_candidate_state(
         update_candidate(
             database, candidate_url, state, reason=reason,
             official_url=official_url, unit_name=record.unit_name,
+        )
+        save_draft(
+            database,
+            CampaignLead(candidate_url, title, official_url, "", listing_url=official_url),
+            record, evidence or {},
         )
 
 
@@ -137,6 +145,11 @@ def run(
     )
     print("LLM抽取成功")
 
+    if verified_organization and seed_name_supported_by_notice(record.unit_name, verified_organization[0], material):
+        # Exact legal name on the fetched employer notice takes precedence over
+        # an abbreviated LLM name; the relationship itself was verified above.
+        record = record.model_copy(update={"unit_name": verified_organization[0]})
+
     organization = lookup_organization(record.unit_name)
     if organization is None and verified_organization and record.unit_name == verified_organization[0]:
         organization = verified_organization[1]
@@ -158,14 +171,14 @@ def run(
     evidence = build_field_evidence(record, campaign, structured_jobs, organization)
     candidate_url = candidate_notice_url or source_url
     if require_verified_identity and not ccb_acceptance and organization is None:
-        record_candidate_state(settings, candidate_url, official_url, record, "待核验", "缺少官方组织身份证据")
+        record_candidate_state(settings, candidate_url, official_url, record, "待核验", "缺少官方组织身份证据", evidence)
         print("组织身份待核验，保留候选，不进入正式招聘表")
         return record
     if require_verified_identity and not ccb_acceptance and (not is_product_record(record, checked_on) or not record.application_url):
         closed = record.status == "已截止" or (record.deadline is not None and record.deadline < checked_on)
         state = "已截止" if closed else "待核验"
         reason = "已过截止日期" if closed else "缺少当前可投递所需的招聘范围或报名入口证据"
-        record_candidate_state(settings, candidate_url, official_url, record, state, reason)
+        record_candidate_state(settings, candidate_url, official_url, record, state, reason, evidence)
         print("不符合当前可投递成品范围，未进入正式招聘表")
         return record
     if require_verified_identity and verify_online and not ccb_acceptance and record.application_url:
@@ -174,17 +187,17 @@ def run(
                 code = response.status_code
                 if code in {401, 403, 412, 429}:
                     record_candidate_state(settings, candidate_notice_url or source_url, official_url, record,
-                                           "待核验", f"报名入口公开访问受限（HTTP {code}）")
+                                           "待核验", f"报名入口公开访问受限（HTTP {code}）", evidence)
                     raise AccessRestricted(record.application_url, code, "报名入口访问受限")
                 if code >= 400:
                     record_candidate_state(settings, candidate_notice_url or source_url, official_url, record,
-                                           "待核验", f"报名入口无法打开（HTTP {code}）")
+                                           "待核验", f"报名入口无法打开（HTTP {code}）", evidence)
                     return record
         except AccessRestricted:
             raise
         except requests.RequestException as error:
             record_candidate_state(settings, candidate_notice_url or source_url, official_url, record,
-                                   "待核验", f"报名入口无法打开（{type(error).__name__}）")
+                                   "待核验", f"报名入口无法打开（{type(error).__name__}）", evidence)
             return record
     with closing(connect_database(settings.database_path)) as database:
         if require_verified_identity and not ccb_acceptance:

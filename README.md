@@ -44,17 +44,19 @@ python first_batch.py
 
 ## 企业招聘源试运行
 
-`discovery/seeds.json` 是独立维护的企业招聘入口清单，记录企业名称、类型、上级集团、招聘入口、官方域名、平台、来源、核验日期和启用状态。首批只含 20 家央企或其子公司；`source` 是逐家检查的官方页面，不直接复制第三方项目的数据文件。运行时的访问结果和最近实际检查日期分别写入 SQLite 的 `career_seed_checks` 与 `career_seeds`，不会把一个站点的失败当成整批失败。
+`discovery/seeds.json` 是独立维护的企业招聘入口清单，记录企业名称、类型、上级集团、招聘入口、官方域名、平台、来源、核验日期和启用状态。目前包含 50 家央企或其子公司的官方招聘入口；`source` 是逐家检查的官方页面，不直接复制第三方项目的数据文件。运行时的访问结果和最近实际检查日期分别写入 SQLite 的 `career_seed_checks` 与 `career_seeds`，不会把一个站点的失败当成整批失败。
 
 ```bash
-python batch_discovery.py --limit 20
+python batch_discovery.py --limit 50
 ```
 
-流程先识别招聘平台，再用通用官网页面或北森公开校招接口发现 2027 届活动。通用页面只查看 Seed 入口及其明确指向的最多 3 条活动；北森最多读取 3 页公开岗位列表。平台尚未接入、访问受限、缺少明确活动或组织身份证据的线索进入候选区，不会直接进入客户 Excel。北森公开岗位中的学历、地点等字段保存为带来源 URL 的 17 字段草稿；没有明确活动公告和投递入口时不正式收录。当前不使用浏览器自动化，也不处理登录、验证码、请求签名或 JS Challenge。
+流程先识别招聘平台，再用通用官网页面或北森公开校招接口发现 2027 届活动。通用页面只查看 Seed 入口及其明确指向的最多 3 条活动；北森最多读取 3 页公开岗位列表。专题内的报名指引、明确标记的申请按钮和页面内 JSON 可提供报名证据；普通岗位列表不能充当报名入口。平台尚未接入、访问受限、缺少明确活动或组织身份证据的线索进入候选区，不会直接进入客户 Excel。候选抽取结果与字段来源 URL 保存在本地数据库，方便复核。当前不使用浏览器自动化，也不处理登录、验证码、请求签名或 JS Challenge。
+
+`discovery/search_provider.py` 仅定义搜索回退接口、候选评分和离线 mock，尚未连接真实搜索服务；程序不会抓取搜索引擎结果页。需要启用自动搜索时，须提供一个合法的搜索 API Key，例如 Bing Web Search API Key。`processing/organization_relations.json` 保存逐家检查的官方多层控股证据链；只有精确匹配单位名称、集团名称及国务院国资委央企名录时才用于正式收录。
 
 每次运行输出 `data/output/seed_batch_report.json` 和 `data/output/2027届央国企校招汇总.xlsx`。报告使用 `success`、`no_2027_recruitment`、`expired`、`pending_manual_review`、`access_control`、`unsupported_platform`、`parse_failed` 七种检查状态。`access_control` 保存失败入口、HTTP 状态和检查时间；例如国家电网 HTTP 412 只记录并跳过。报告中的学历、专业和链接字段比例以本批正式收录记录为分母；发现活动的解析率和正式收录率单独统计。原国资委栏目候选继续保存在 `candidates`，不会在这条流程中删除或逐条重试。
 
-源清单与活动记录分开维护的思路参考 [xiaozhao-radar](https://github.com/jiabaobei/xiaozhao-radar)；按招聘平台复用适配器、按届别筛选的思路参考 [career-agent](https://github.com/mengxi111/career-agent)；公开 ATS 接口优先、记录源核验时间的思路参考 [openhire](https://github.com/gzchenhao/openhire)。本项目的 20 个入口来自逐家官方页面核验，未复制这些项目的代码或批量导入其 Seed 数据，也未接入腾讯文档同步。
+源清单与活动记录分开维护的思路参考 [xiaozhao-radar](https://github.com/jiabaobei/xiaozhao-radar)；按招聘平台复用适配器、按届别筛选的思路参考 [career-agent](https://github.com/mengxi111/career-agent)；公开 ATS 接口优先、记录源核验时间的思路参考 [openhire](https://github.com/gzchenhao/openhire)。入口来自逐家官方页面核验，未复制这些项目的代码或批量导入其 Seed 数据，也未接入腾讯文档同步。
 
 ## V1 范围
 

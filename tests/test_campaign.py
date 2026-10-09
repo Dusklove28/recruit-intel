@@ -1,4 +1,4 @@
-from collectors.campaign import campaign_prefix, explore_campaign, within_campaign
+from collectors.campaign import _application_candidates, campaign_prefix, explore_campaign, within_campaign
 from collectors.generic import Announcement
 from parsers.html_parser import HTMLLink
 
@@ -39,3 +39,12 @@ def test_campaign_scope_stays_in_one_topic(monkeypatch):
     host, prefix = campaign_prefix("https://campus.51job.com/cofco/brochure.html")
     assert within_campaign("https://campus.51job.com/cofco/campus.html", host, prefix)
     assert not within_campaign("https://campus.51job.com/other/campus.html", host, prefix)
+
+
+def test_plain_text_url_next_to_official_application_instruction():
+    page = Announcement(
+        "https://company.example/notice.html", "https://company.example/notice.html",
+        "网申时间为10月。应聘毕业生均需通过官方招聘平台报名，登录网址："
+        "https://jobs.company.example/。", [], [], "",
+    )
+    assert _application_candidates([page])[0].url == "https://jobs.company.example/"

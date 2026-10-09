@@ -12,6 +12,7 @@ import requests
 
 from collectors.campaign import explore_campaign
 from collectors.ccb import collect_ccb_campaign, create_ccb_session, is_ccb_announcement
+from collectors.discovery import Candidate
 from collectors.generic import download_attachment
 from collectors.public_jobs import collect_structured_jobs
 from config import PRODUCT_OUTPUT_PATH, PROJECT_ROOT, Settings
@@ -22,12 +23,28 @@ from parsers.docx_parser import parse_docx
 from parsers.excel_parser import parse_excel
 from parsers.pdf_parser import parse_pdf
 from processing.evidence import build_field_evidence
-from processing.organization_registry import lookup_organization
+from processing.organization_registry import (
+    lookup_organization, save_verified_organization, verify_central_group,
+)
 from processing.product_scope import is_product_record
 from storage.database import connect_database, list_records, save_record
+from storage.candidates import save_candidates, update_candidate
 
 
 CHINA_TIME = timezone(timedelta(hours=8))
+
+
+def record_candidate_state(
+    settings: Settings, candidate_url: str, official_url: str,
+    record: RecruitmentRecord, state: str, reason: str | None = None,
+) -> None:
+    with closing(connect_database(settings.database_path)) as database:
+        title = " ".join(part for part in (record.unit_name, record.batch) if part) or official_url
+        save_candidates(database, [Candidate("直接输入", candidate_url, title, candidate_url)])
+        update_candidate(
+            database, candidate_url, state, reason=reason,
+            official_url=official_url, unit_name=record.unit_name,
+        )
 
 
 def parse_attachment(path: Path) -> tuple[str, bool]:
@@ -42,7 +59,11 @@ def parse_attachment(path: Path) -> tuple[str, bool]:
     raise ValueError(f"不支持的附件格式：{suffix}")
 
 
-def run(source_url: str, settings: Settings | None = None) -> None:
+def run(
+    source_url: str, settings: Settings | None = None, *,
+    verify_online: bool = True, require_verified_identity: bool = True,
+    candidate_notice_url: str | None = None,
+) -> RecruitmentRecord:
     ccb_acceptance = is_ccb_announcement(source_url)
     settings = settings or Settings.from_env()
     if ccb_acceptance and (
@@ -115,6 +136,11 @@ def run(source_url: str, settings: Settings | None = None) -> None:
     print("LLM抽取成功")
 
     organization = lookup_organization(record.unit_name)
+    if organization is None and verify_online and not ccb_acceptance:
+        try:
+            organization = verify_central_group(record.unit_name)
+        except (requests.RequestException, ValueError):
+            print("官方央企名录读取失败，组织身份待核验")
     if organization:
         record = RecruitmentRecord.model_validate({
             **record.model_dump(),
@@ -126,8 +152,37 @@ def run(source_url: str, settings: Settings | None = None) -> None:
         print("官方组织名录无精确匹配，组织字段留空")
     print("Pydantic校验通过")
     evidence = build_field_evidence(record, campaign, structured_jobs, organization)
+    candidate_url = candidate_notice_url or source_url
+    if require_verified_identity and not ccb_acceptance and organization is None:
+        record_candidate_state(settings, candidate_url, official_url, record, "待核验", "缺少官方组织身份证据")
+        print("组织身份待核验，保留候选，不进入正式招聘表")
+        return record
+    if require_verified_identity and not ccb_acceptance and (not is_product_record(record, checked_on) or not record.application_url):
+        closed = record.status == "已截止" or (record.deadline is not None and record.deadline < checked_on)
+        state = "已截止" if closed else "待核验"
+        reason = "已过截止日期" if closed else "缺少当前可投递所需的招聘范围或报名入口证据"
+        record_candidate_state(settings, candidate_url, official_url, record, state, reason)
+        print("不符合当前可投递成品范围，未进入正式招聘表")
+        return record
     with closing(connect_database(settings.database_path)) as database:
+        if require_verified_identity and not ccb_acceptance:
+            previous = database.execute(
+                "SELECT source_url FROM recruitment WHERE unit_name=? AND batch=? AND source_url<>?",
+                (record.unit_name, record.batch, source_url),
+            ).fetchone()
+            if previous:
+                save_candidates(database, [Candidate("直接输入", candidate_url, record.batch or official_url, candidate_url)])
+                update_candidate(database, candidate_url, "待核验", reason="疑似同单位同批次重复活动，需复核",
+                                 official_url=official_url, unit_name=record.unit_name)
+                print("疑似重复活动，保留候选，未进入正式招聘表")
+                return record
+        if organization and record.unit_name:
+            save_verified_organization(database, record.unit_name, organization)
         record = save_record(database, source_url, record, raw_text, evidence)
+        if candidate_notice_url:
+            save_candidates(database, [Candidate("直接输入", candidate_url, record.batch or official_url, candidate_url)])
+            update_candidate(database, candidate_url, "正式收录", reason="已核验企业公告与组织身份",
+                             official_url=official_url, unit_name=record.unit_name)
         print("SQLite保存成功")
         records = list_records(database)
     if settings.output_path == PRODUCT_OUTPUT_PATH:
@@ -138,6 +193,7 @@ def run(source_url: str, settings: Settings | None = None) -> None:
         f"摘要：{record.unit_name} | {record.batch or '批次未确认'} | "
         f"{record.education or '学历未确认'} | {record.status or '状态未确认'}"
     )
+    return record
 
 
 def main() -> int:

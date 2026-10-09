@@ -67,10 +67,38 @@ def test_one_url_to_sqlite_and_xlsx_with_attachment(monkeypatch, tmp_path, capsy
     assert records[0].parent_unit == "国务院国资委"
     assert records[0].updated_date == records[0].verified_date
     assert len(evidence) == 17
-    assert evidence["单位类型"][0].startswith("https://wap.sasac.gov.cn/")
+    assert evidence["单位类型"][0].startswith("http://wap.sasac.gov.cn/")
     assert evidence["报名入口"] == ["https://example.com/notice"]
     assert settings.output_path.exists()
     output = capsys.readouterr().out
     assert "发现附件 1 个" in output
     assert "Pydantic校验通过" in output
     assert "Excel导出成功" in output
+
+
+def test_unknown_organization_stays_candidate_outside_formal_table(monkeypatch, tmp_path):
+    import main
+
+    source = "https://example.com/campus/notice.html"
+    page = Announcement(source, source, "某国有企业2027届校园招聘", [], [])
+    bundle = CampaignBundle(source, [page], [], [], [])
+    monkeypatch.setattr(main, "explore_campaign", lambda url, session: bundle)
+    monkeypatch.setattr(main, "collect_structured_jobs", lambda campaign, session: None)
+
+    class FakeQwenClient:
+        def __init__(self, settings):
+            pass
+
+        def complete_json(self, system_prompt, user_prompt):
+            return json.dumps(sample_payload(), ensure_ascii=False)
+
+    monkeypatch.setattr(main, "QwenClient", FakeQwenClient)
+    settings = Settings("test-value", "https://example.com/v1", "test-model",
+                        database_path=tmp_path / "recruitment.sqlite3",
+                        output_path=tmp_path / "output.xlsx")
+    run(source, settings, verify_online=False)
+    with connect_database(settings.database_path) as database:
+        assert database.execute("SELECT COUNT(*) FROM recruitment").fetchone()[0] == 0
+        state = database.execute("SELECT state FROM candidates").fetchone()[0]
+    assert state == "待核验"
+    assert not settings.output_path.exists()

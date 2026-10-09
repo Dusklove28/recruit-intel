@@ -71,8 +71,10 @@ def _application_candidates(pages: list[Announcement]) -> list[ApplicationCandid
         if guide:
             for url in SCRIPT_OPEN.findall(page.html):
                 candidates.append(ApplicationCandidate(url, page.final_url, 0))
-            for url in WEB_URL.findall(page.text):
-                candidates.append(ApplicationCandidate(url.rstrip(".)"), page.final_url, 2))
+        for match in WEB_URL.finditer(page.text):
+            context = page.text[max(0, match.start() - 90):match.end() + 25]
+            if re.search(r"报名|网申|投递|招聘平台|登录网址", context):
+                candidates.append(ApplicationCandidate(match.group().rstrip(".)]）"), page.final_url, 2))
         for link in page.links:
             if APPLICATION.search(link.text):
                 candidates.append(

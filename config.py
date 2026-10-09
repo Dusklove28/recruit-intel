@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
+PRODUCT_OUTPUT_PATH = PROJECT_ROOT / "data" / "output" / "2027届央国企校招汇总.xlsx"
 
 
 @dataclass(frozen=True)
@@ -17,7 +18,7 @@ class Settings:
     model: str
     database_path: Path = PROJECT_ROOT / "data" / "recruitment.sqlite3"
     attachments_dir: Path = PROJECT_ROOT / "data" / "attachments"
-    output_path: Path = PROJECT_ROOT / "data" / "output" / "2027届央国企事业编招聘汇总.xlsx"
+    output_path: Path = PRODUCT_OUTPUT_PATH
 
     @classmethod
     def from_env(cls) -> "Settings":

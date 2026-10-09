@@ -14,7 +14,7 @@ from collectors.campaign import explore_campaign
 from collectors.ccb import collect_ccb_campaign, create_ccb_session, is_ccb_announcement
 from collectors.generic import download_attachment
 from collectors.public_jobs import collect_structured_jobs
-from config import PROJECT_ROOT, Settings
+from config import PRODUCT_OUTPUT_PATH, PROJECT_ROOT, Settings
 from exporters.excel_exporter import export_excel
 from extractor.llm_extractor import QwenClient, extract_record
 from extractor.schema import RecruitmentRecord
@@ -23,6 +23,7 @@ from parsers.excel_parser import parse_excel
 from parsers.pdf_parser import parse_pdf
 from processing.evidence import build_field_evidence
 from processing.organization_registry import lookup_organization
+from processing.product_scope import is_product_record
 from storage.database import connect_database, list_records, save_record
 
 
@@ -46,7 +47,7 @@ def run(source_url: str, settings: Settings | None = None) -> None:
     settings = settings or Settings.from_env()
     if ccb_acceptance and (
         settings.database_path == PROJECT_ROOT / "data" / "recruitment.sqlite3"
-        or settings.output_path == PROJECT_ROOT / "data" / "output" / "2027届央国企事业编招聘汇总.xlsx"
+        or settings.output_path == PRODUCT_OUTPUT_PATH
     ):
         settings = replace(
             settings,
@@ -129,6 +130,8 @@ def run(source_url: str, settings: Settings | None = None) -> None:
         record = save_record(database, source_url, record, raw_text, evidence)
         print("SQLite保存成功")
         records = list_records(database)
+    if settings.output_path == PRODUCT_OUTPUT_PATH:
+        records = [record for record in records if is_product_record(record, checked_on)]
     output = export_excel(records, settings.output_path)
     print(f"Excel导出成功：{output}")
     print(

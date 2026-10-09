@@ -3,12 +3,14 @@
 from collectors.campaign import CampaignBundle
 from collectors.public_jobs import StructuredJobs
 from extractor.schema import FIELD_NAMES, RecruitmentRecord
+from processing.organization_registry import OrganizationMatch
 
 
 def build_field_evidence(
     record: RecruitmentRecord,
     bundle: CampaignBundle,
     jobs: StructuredJobs | None,
+    organization: OrganizationMatch | None = None,
 ) -> dict[str, list[str]]:
     source = bundle.pages[0].final_url
     job_urls = [jobs.campaign_page_url, jobs.listing_url] if jobs else [source]
@@ -19,15 +21,15 @@ def build_field_evidence(
     roles = {
         "序号": [source],
         "单位名称": [source],
-        "单位类型": [],
-        "所属集团/主管单位": [source],
+        "单位类型": list(organization.type_evidence) if organization else [],
+        "所属集团/主管单位": list(organization.parent_evidence) if organization else [],
         "招聘批次": [source],
         "招聘岗位": [source, *job_urls] if jobs else [source],
         "招聘对象": [source],
         "学历要求": job_urls,
         "专业/硬性要求": detail_urls,
         "工作地点": job_urls,
-        "更新时间": [source],
+        "更新时间": [],  # Internally managed content date, not an announcement date.
         "截止时间": [source],
         "招聘状态": [source],
         "官方公告": [source],

@@ -29,6 +29,8 @@ def finalize_record(
     data["官方公告"] = official_url
     data["最后核验日期"] = checked_on.isoformat()
     data["单位类型"] = None
+    data["所属集团/主管单位"] = None
+    data["更新时间"] = None
     for field, value in (trusted_fields or {}).items():
         if field not in {"学历要求", "工作地点"}:
             raise ValueError(f"不允许覆盖字段：{field}")

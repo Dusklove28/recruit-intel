@@ -1,6 +1,6 @@
 """One announcement URL is one row; repeated runs update that row."""
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import json
 from pathlib import Path
 import sqlite3
@@ -9,6 +9,12 @@ from extractor.schema import RecruitmentRecord
 
 
 COLUMNS = list(RecruitmentRecord.model_fields)
+CHINA_TIME = timezone(timedelta(hours=8))
+# A verification changes verified_date, but only a public field change changes
+# the record's content update date. Sequence is only an export row number.
+CONTENT_COLUMNS = [
+    name for name in COLUMNS if name not in {"sequence", "updated_date", "verified_date"}
+]
 SCHEMA_TYPES = {
     "sequence": "INTEGER",
     **{name: "TEXT" for name in COLUMNS if name != "sequence"},
@@ -40,9 +46,24 @@ def connect_database(path: Path) -> sqlite3.Connection:
 def save_record(
     connection: sqlite3.Connection, source_url: str, record: RecruitmentRecord, raw_text: str,
     field_evidence: dict[str, list[str]] | None = None,
-) -> None:
+) -> RecruitmentRecord:
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     values = record.model_dump(mode="json")
+    checked_on = record.verified_date or datetime.now(CHINA_TIME).date()
+    existing = connection.execute(
+        f"SELECT {', '.join(COLUMNS)}, created_at FROM recruitment WHERE source_url = ?",
+        (source_url,),
+    ).fetchone()
+    if existing is None or any(existing[name] != values[name] for name in CONTENT_COLUMNS):
+        content_updated_on = checked_on
+    elif existing["updated_date"]:
+        content_updated_on = date.fromisoformat(existing["updated_date"])
+    else:
+        # Legacy records without this system-managed field retain their first
+        # local collection date when a verification finds no content change.
+        content_updated_on = datetime.fromisoformat(existing["created_at"]).astimezone(CHINA_TIME).date()
+    values["updated_date"] = content_updated_on.isoformat()
+    values["verified_date"] = checked_on.isoformat()
     names = ["source_url", *COLUMNS, "raw_text", "field_evidence", "created_at", "updated_at"]
     placeholders = ", ".join("?" for _ in names)
     update_assignments = ", ".join(
@@ -55,6 +76,7 @@ def save_record(
          json.dumps(field_evidence or {}, ensure_ascii=False), now, now],
     )
     connection.commit()
+    return RecruitmentRecord.model_validate(values)
 
 
 def list_records(connection: sqlite3.Connection) -> list[RecruitmentRecord]:

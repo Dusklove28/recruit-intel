@@ -15,10 +15,12 @@ from collectors.public_jobs import collect_structured_jobs
 from config import Settings
 from exporters.excel_exporter import export_excel
 from extractor.llm_extractor import QwenClient, extract_record
+from extractor.schema import RecruitmentRecord
 from parsers.docx_parser import parse_docx
 from parsers.excel_parser import parse_excel
 from parsers.pdf_parser import parse_pdf
 from processing.evidence import build_field_evidence
+from processing.organization_registry import lookup_organization
 from storage.database import connect_database, list_records, save_record
 
 
@@ -97,11 +99,21 @@ def run(source_url: str, settings: Settings | None = None) -> None:
         preferred_application, trusted_fields,
     )
     print("LLM抽取成功")
-    print("Pydantic校验通过")
 
-    evidence = build_field_evidence(record, campaign, structured_jobs)
+    organization = lookup_organization(record.unit_name)
+    if organization:
+        record = RecruitmentRecord.model_validate({
+            **record.model_dump(),
+            "unit_type": organization.unit_type,
+            "parent_unit": organization.parent_unit,
+        })
+        print("官方组织名录核验通过")
+    else:
+        print("官方组织名录无精确匹配，组织字段留空")
+    print("Pydantic校验通过")
+    evidence = build_field_evidence(record, campaign, structured_jobs, organization)
     with closing(connect_database(settings.database_path)) as database:
-        save_record(database, source_url, record, raw_text, evidence)
+        record = save_record(database, source_url, record, raw_text, evidence)
         print("SQLite保存成功")
         records = list_records(database)
     output = export_excel(records, settings.output_path)

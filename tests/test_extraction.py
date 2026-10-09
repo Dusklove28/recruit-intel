@@ -84,6 +84,8 @@ def test_unit_type_without_metadata_is_left_empty_and_job_page_is_not_signup():
 
     payload = sample_payload()
     payload["报名入口"] = "https://example.com/campus.html"
+    payload["所属集团/主管单位"] = "模型猜测的集团"
+    payload["更新时间"] = "2026-09-01"
     record = finalize_record(
         payload,
         "https://example.com/brochure.html",
@@ -92,6 +94,8 @@ def test_unit_type_without_metadata_is_left_empty_and_job_page_is_not_signup():
         date(2026, 10, 9),
     )
     assert record.unit_type is None
+    assert record.parent_unit is None
+    assert record.updated_date is None
     assert record.application_url is None
 
 

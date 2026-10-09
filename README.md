@@ -18,6 +18,8 @@ LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 LLM_MODEL=你已测试的模型名
 ```
 
+也可以使用 `LLM_MODEL_PRIMARY` 指定主模型，并按序配置 `LLM_MODEL_FALLBACK_1`、`LLM_MODEL_FALLBACK_2` 等备用模型。设置主模型后，旧变量 `LLM_MODEL` 仍可继续使用。只有百炼返回 HTTP 403 且结构化错误码为 `AllocationQuota.FreeTierOnly` 时，程序才会切到下一个模型；限流、网络错误、参数错误和鉴权错误不会触发模型切换。建议在百炼控制台为各模型开启“免费额度用完即停”。
+
 也可直接设置同名环境变量。`.env`、本地数据库、附件、缓存和导出的 Excel 均被 Git 忽略。不要把密钥写入代码或提交到仓库。
 
 ## 运行
@@ -45,6 +47,10 @@ python first_batch.py
 ## 企业招聘源试运行
 
 `discovery/seeds.json` 是独立维护的企业招聘入口清单，记录企业名称、类型、上级集团、招聘入口、官方域名、平台、来源、核验日期和启用状态。目前包含 50 家央企或其子公司的官方招聘入口；`source` 是逐家检查的官方页面，不直接复制第三方项目的数据文件。运行时的访问结果和最近实际检查日期分别写入 SQLite 的 `career_seed_checks` 与 `career_seeds`，不会把一个站点的失败当成整批失败。
+
+将用户提供的历史招聘 SourceSeed 工作簿放在项目根目录后，可用 `python first_historical_batch.py --limit 100` 重新核验首批高价值招聘源。历史 URL 只作为线索；当前来源、证据 URL、平台和核验状态保存在本地 SQLite 并导出到 `data/output/source_registry_verified.xlsx`。缺失的入口或 2027 活动由 Tavily 按公司精确搜索补充，每家公司最多 2 个查询、每个查询最多 5 条结果；搜索结果必须直接打开和核验。运行报告写入 `data/output/source_registry_batch_report.json`。项目根目录历史工作簿、`.env`、数据库和全部生成数据均不会提交。
+
+若某批搜索额度已使用或搜索用量需要先核对，可增加 `--no-search`，仅重新检查工作簿里的候选根入口和历史入口，不调用搜索 API。
 
 ```bash
 python batch_discovery.py --limit 50

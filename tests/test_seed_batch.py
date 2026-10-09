@@ -117,7 +117,7 @@ def test_access_control_is_recorded_and_next_seed_continues(tmp_path, monkeypatc
     settings = Settings("unused", "https://unused.example", "unused", tmp_path / "local.sqlite3", tmp_path / "attachments", tmp_path / "output" / "trial.xlsx")
     report, output = run_batch(settings, [first, second], sleep_seconds=0)
     assert output.exists()
-    assert [item.status for item in report.results] == ["access_control", "pending_manual_review"]
+    assert [item.status for item in report.results] == ["access_control", "no_2027_recruitment"]
     assert report.results[0].http_status == 412
     assert report.results[0].failed_url == first.career_url
     with sqlite3.connect(settings.database_path) as connection:

@@ -19,16 +19,26 @@ class Settings:
     database_path: Path = PROJECT_ROOT / "data" / "recruitment.sqlite3"
     attachments_dir: Path = PROJECT_ROOT / "data" / "attachments"
     output_path: Path = PRODUCT_OUTPUT_PATH
+    fallback_models: tuple[str, ...] = ()
 
     @classmethod
     def from_env(cls) -> "Settings":
         load_dotenv(PROJECT_ROOT / ".env")
+        primary_model = os.getenv("LLM_MODEL_PRIMARY", "").strip() or os.getenv("LLM_MODEL", "").strip()
+        fallback_models = tuple(
+            value for value in (
+                os.getenv(f"LLM_MODEL_FALLBACK_{index}", "").strip()
+                for index in range(1, 11)
+            ) if value and value != primary_model
+        )
+        fallback_models = tuple(dict.fromkeys(fallback_models))
         values = {
             "api_key": os.getenv("DASHSCOPE_API_KEY", "").strip(),
             "base_url": os.getenv("LLM_BASE_URL", "").strip(),
-            "model": os.getenv("LLM_MODEL", "").strip(),
+            "model": primary_model,
+            "fallback_models": fallback_models,
         }
-        missing = [name for name, value in values.items() if not value]
+        missing = [name for name in ("api_key", "base_url", "model") if not values[name]]
         if missing:
             raise ValueError("缺少配置：" + ", ".join(missing) + "。请检查环境变量或 .env。")
         return cls(**values)

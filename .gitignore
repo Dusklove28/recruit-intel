@@ -1,6 +1,7 @@
 .env
 .env.*
 !.env.example
+央国企历史招聘SourceSeed库_2025-2026_复核版.xlsx
 .venv/
 __pycache__/
 .pytest_cache/

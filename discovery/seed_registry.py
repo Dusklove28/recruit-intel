@@ -8,7 +8,10 @@ import sqlite3
 from urllib.parse import urlparse
 
 
-PLATFORMS = frozenset({"moka", "beisen", "feishu", "51job_campus", "iguopin", "custom", "unknown"})
+PLATFORMS = frozenset({
+    "moka", "beisen", "feishu", "51job_campus", "hotjob", "zhilian",
+    "chinahr", "iguopin", "wechat", "custom", "unknown",
+})
 TYPES = frozenset({"央企", "央企子公司", "地方国企"})
 SEED_FILE = Path(__file__).with_name("seeds.json")
 

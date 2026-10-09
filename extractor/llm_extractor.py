@@ -2,6 +2,9 @@
 
 from datetime import date
 import json
+import threading
+from collections import defaultdict
+from typing import Any
 
 from openai import OpenAI
 from pydantic import ValidationError
@@ -12,9 +15,60 @@ from extractor.schema import RecruitmentRecord
 from processing.validate import finalize_record
 
 
+USAGE: dict[str, Any] = {
+    "calls": 0, "prompt_tokens": 0, "completion_tokens": 0,
+    "fallback_switches": 0, "models": {},
+}
+_USAGE_LOCK = threading.Lock()
+_ACTIVE_MODELS: dict[tuple[str, str, tuple[str, ...]], int] = {}
+_ACTIVE_LOCK = threading.Lock()
+
+
+def reset_usage() -> None:
+    with _USAGE_LOCK:
+        USAGE.update({"calls": 0, "prompt_tokens": 0, "completion_tokens": 0,
+                      "fallback_switches": 0, "models": {}})
+
+
+def usage_snapshot() -> dict[str, Any]:
+    with _USAGE_LOCK:
+        return {**USAGE, "models": {name: dict(values) for name, values in USAGE["models"].items()}}
+
+
+def _error_code(value: Any, depth: int = 0) -> set[str]:
+    """Collect structured error codes without relying on incidental prose."""
+    if depth > 4 or value is None:
+        return set()
+    codes: set[str] = set()
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if str(key).lower() == "code" and isinstance(child, str):
+                codes.add(child)
+            elif isinstance(child, (dict, list)):
+                codes.update(_error_code(child, depth + 1))
+    elif isinstance(value, list):
+        for child in value:
+            codes.update(_error_code(child, depth + 1))
+    return codes
+
+
+def is_free_tier_quota_error(error: Exception) -> bool:
+    """True only for the exact documented Bailian free-tier exhaustion code."""
+    if getattr(error, "status_code", None) != 403:
+        return False
+    body = getattr(error, "body", None)
+    if isinstance(body, str):
+        try:
+            body = json.loads(body)
+        except json.JSONDecodeError:
+            return False
+    return "AllocationQuota.FreeTierOnly" in _error_code(body)
+
+
 class QwenClient:
     def __init__(self, settings: Settings, client: OpenAI | None = None) -> None:
-        self.model = settings.model
+        self.models = tuple(dict.fromkeys((settings.model, *settings.fallback_models)))
+        self._model_key = (settings.base_url.rstrip("/"), settings.model, settings.fallback_models)
         self.client = client or OpenAI(
             api_key=settings.api_key,
             base_url=settings.base_url,
@@ -23,19 +77,48 @@ class QwenClient:
         )
 
     def complete_json(self, system_prompt: str, user_prompt: str) -> str:
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            response_format={"type": "json_object"},
-            temperature=0,
-        )
-        content = response.choices[0].message.content
-        if not content:
-            raise ValueError("LLM 未返回 JSON 内容")
-        return content
+        while True:
+            with _ACTIVE_LOCK:
+                index = _ACTIVE_MODELS.get(self._model_key, 0)
+            model = self.models[index]
+            try:
+                with _USAGE_LOCK:
+                    USAGE["calls"] += 1
+                    model_stats = USAGE["models"].setdefault(model, {"calls": 0, "quota_exhausted": 0})
+                    model_stats["calls"] += 1
+                response = self.client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0,
+                )
+                usage = getattr(response, "usage", None)
+                if usage:
+                    with _USAGE_LOCK:
+                        USAGE["prompt_tokens"] += int(getattr(usage, "prompt_tokens", 0) or 0)
+                        USAGE["completion_tokens"] += int(getattr(usage, "completion_tokens", 0) or 0)
+                content = response.choices[0].message.content
+                if not content:
+                    raise ValueError("LLM 未返回 JSON 内容")
+                return content
+            except Exception as error:
+                if not is_free_tier_quota_error(error):
+                    raise
+                with _USAGE_LOCK:
+                    USAGE["models"].setdefault(model, {"calls": 0, "quota_exhausted": 0})["quota_exhausted"] += 1
+                with _ACTIVE_LOCK:
+                    current = _ACTIVE_MODELS.get(self._model_key, 0)
+                    if current == index and index + 1 < len(self.models):
+                        _ACTIVE_MODELS[self._model_key] = index + 1
+                        with _USAGE_LOCK:
+                            USAGE["fallback_switches"] += 1
+                        continue
+                    if current > index:
+                        continue
+                raise
 
 
 def extract_record(

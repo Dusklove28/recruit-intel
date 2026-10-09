@@ -16,6 +16,14 @@ def detect_platform(url: str, html: str = "", official_domain: str | None = None
         return "feishu"
     if host == "campus.51job.com" or ("51job" in host and re.search(r"campus|xyzp", path)):
         return "51job_campus"
+    if host.endswith(".hotjob.cn") or host == "hotjob.cn":
+        return "hotjob"
+    if host == "campus.chinahr.com" or host.endswith(".chinahr.com"):
+        return "chinahr"
+    if host == "campus.zhaopin.com" or host.endswith(".zhaopin.com.cn") or host.endswith(".zhaopin.com"):
+        return "zhilian"
+    if host.endswith(".weixin.qq.com") or host == "mp.weixin.qq.com":
+        return "wechat"
     if host.endswith(".iguopin.com") or host == "iguopin.com" or host.endswith(".iguopin.cn"):
         return "iguopin"
     domain = (official_domain or "").lower().lstrip(".")

@@ -86,7 +86,12 @@ class GenericAdapter:
             leads.append(CampaignLead(url, label[:180], response.url, _cohort_evidence(label)))
             if len(leads) >= MAX_LEADS_PER_SEED:
                 break
-        if not leads and _looks_like_notice(response.url) and _cohort_evidence(page_text):
-            title = soup.title.get_text(" ", strip=True) if soup.title else f"{seed.organization_name}2027届校园招聘"
+        title_text = soup.title.get_text(" ", strip=True) if soup.title else ""
+        direct_campaign_page = bool(
+            _cohort_evidence(page_text)
+            and re.search(r"校园招聘|校招|应届生|毕业生", title_text + " " + urlparse(response.url).path, re.I)
+        )
+        if not leads and ((_looks_like_notice(response.url) or direct_campaign_page) and _cohort_evidence(page_text)):
+            title = title_text or f"{seed.organization_name}2027届校园招聘"
             leads.append(CampaignLead(response.url, title[:180], response.url, _cohort_evidence(page_text)))
         return DiscoveryOutcome(seed, platform, True, leads, "" if leads else "未发现明确2027届校招活动")

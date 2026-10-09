@@ -141,6 +141,7 @@ def _process_seed(seed: Seed, settings: Settings, connection, *, sleep_seconds: 
                 "expired" if "均已截止" in outcome.reason else
                 "no_2027_recruitment" if "校招栏目无公开岗位" in outcome.reason
                 or "未发现2027届岗位" in outcome.reason
+                or "未发现明确2027届校招活动" in outcome.reason
                 else "pending_manual_review"
             )
             result.reason = outcome.reason

@@ -4,7 +4,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 import re
-from urllib.parse import urldefrag, urljoin, urlparse
+from urllib.parse import parse_qs, urldefrag, urljoin, urlparse
 
 import requests
 
@@ -44,7 +44,8 @@ def campaign_prefix(url: str) -> tuple[str, str]:
         raise ValueError("仅支持 HTTP/HTTPS 招聘公告")
     directory = str(PurePosixPath(parsed.path).parent)
     prefix = directory.rstrip("/") + "/"
-    if prefix == "/":
+    single_query = any(key in parse_qs(parsed.query) for key in ("id", "aId", "annoId"))
+    if prefix == "/" and not single_query:
         raise ValueError("公告 URL 缺少可限定的招聘专题路径")
     return parsed.hostname.lower(), prefix
 
@@ -90,6 +91,7 @@ def _application_candidates(pages: list[Announcement]) -> list[ApplicationCandid
 
 def explore_campaign(source_url: str, session: requests.Session | None = None) -> CampaignBundle:
     host, prefix = campaign_prefix(source_url)
+    single_query = any(key in parse_qs(urlparse(source_url).query) for key in ("id", "aId", "annoId"))
     client = session or requests.Session()
     queue = deque([source_url])
     queued = {source_url}
@@ -109,6 +111,8 @@ def explore_campaign(source_url: str, session: requests.Session | None = None) -
             warnings.append(f"跳转离开招聘专题，已跳过：{url}")
             continue
         pages.append(page)
+        if single_query:
+            break
         if campaign_year is None:
             match = re.search(r"20\d{2}届", page.text)
             campaign_year = match.group(0) if match else None
@@ -128,7 +132,11 @@ def explore_campaign(source_url: str, session: requests.Session | None = None) -
     seen: set[str] = set()
     for page in pages:
         for link in page.attachments:
-            if within_campaign(link.url, host, prefix) and link.url not in seen:
+            attachment_in_scope = (
+                (urlparse(link.url).hostname or "").lower() == host
+                if single_query else within_campaign(link.url, host, prefix)
+            )
+            if attachment_in_scope and link.url not in seen:
                 attachments.append(link)
                 seen.add(link.url)
     return CampaignBundle(

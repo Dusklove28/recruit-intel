@@ -9,9 +9,13 @@ from functools import lru_cache
 import json
 import re
 import sqlite3
+from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 import requests
+
+from collectors.generic import fetch_announcement
+from discovery.seed_registry import Seed
 
 
 SASAC_CENTRAL_ENTERPRISES_URL = (
@@ -78,6 +82,36 @@ def verify_central_group(official_name: str | None) -> OrganizationMatch | None:
         parent_unit="国务院国资委",
         type_evidence=(SASAC_CENTRAL_ENTERPRISES_URL,),
         parent_evidence=(SASAC_CENTRAL_ENTERPRISES_URL, SASAC_CENTRAL_ENTERPRISE_RULE_URL),
+    )
+
+
+def verify_child_seed(seed: Seed) -> OrganizationMatch | None:
+    """Use an official company page with an explicit exact-name parent relation."""
+    if seed.organization_type != "央企子公司" or not seed.parent_group:
+        return None
+    source_host = (urlparse(seed.source).hostname or "").lower()
+    official_domain = seed.official_domain.lower().lstrip(".")
+    if source_host != official_domain and not source_host.endswith("." + official_domain):
+        return None
+    if seed.parent_group not in central_enterprise_names():
+        return None
+    page = fetch_announcement(seed.source)
+    if (urlparse(page.final_url).hostname or "").lower() != source_host:
+        return None
+    body = re.sub(r"\s+", "", page.text)
+    child, parent = re.escape(seed.organization_name), re.escape(seed.parent_group)
+    relation = re.search(
+        rf"{child}.{{0,160}}?{parent}.{{0,24}}?(?:子企业|子公司|旗下)"
+        rf"|{child}.{{0,160}}?(?:母公司为|隶属于){parent}",
+        body,
+    )
+    if not relation:
+        return None
+    return OrganizationMatch(
+        unit_type="央企子公司",
+        parent_unit=seed.parent_group,
+        type_evidence=(seed.source, SASAC_CENTRAL_ENTERPRISES_URL),
+        parent_evidence=(seed.source,),
     )
 
 

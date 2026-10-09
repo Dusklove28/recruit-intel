@@ -42,6 +42,20 @@ python first_batch.py
 
 该命令只读取已批准的国务院国资委、北京、上海、深圳四个招聘栏目；国务院国资委只看首页和最近六页归档，其余栏目只看首个公开页面。发现结果先保存在 SQLite 的 `candidates` 表，默认状态为“待核验”，不会直接进入正式 `recruitment` 表或客户 Excel。企业官网公告、报名入口、组织身份核验完成后，才可标记为“正式收录”。当前首批仍在试运行，尚未完成全国地方国企覆盖。
 
+## 企业招聘源试运行
+
+`discovery/seeds.json` 是独立维护的企业招聘入口清单，记录企业名称、类型、上级集团、招聘入口、官方域名、平台、来源、核验日期和启用状态。首批只含 20 家央企或其子公司；`source` 是逐家检查的官方页面，不直接复制第三方项目的数据文件。运行时的访问结果和最近实际检查日期分别写入 SQLite 的 `career_seed_checks` 与 `career_seeds`，不会把一个站点的失败当成整批失败。
+
+```bash
+python batch_discovery.py --limit 20
+```
+
+流程先识别招聘平台，再用通用官网页面或北森公开校招接口发现 2027 届活动。通用页面只查看 Seed 入口及其明确指向的最多 3 条活动；北森最多读取 3 页公开岗位列表。平台尚未接入、访问受限、缺少明确活动或组织身份证据的线索进入候选区，不会直接进入客户 Excel。北森公开岗位中的学历、地点等字段保存为带来源 URL 的 17 字段草稿；没有明确活动公告和投递入口时不正式收录。当前不使用浏览器自动化，也不处理登录、验证码、请求签名或 JS Challenge。
+
+每次运行输出 `data/output/seed_batch_report.json` 和 `data/output/2027届央国企校招汇总.xlsx`。报告使用 `success`、`no_2027_recruitment`、`expired`、`pending_manual_review`、`access_control`、`unsupported_platform`、`parse_failed` 七种检查状态。`access_control` 保存失败入口、HTTP 状态和检查时间；例如国家电网 HTTP 412 只记录并跳过。报告中的学历、专业和链接字段比例以本批正式收录记录为分母；发现活动的解析率和正式收录率单独统计。原国资委栏目候选继续保存在 `candidates`，不会在这条流程中删除或逐条重试。
+
+源清单与活动记录分开维护的思路参考 [xiaozhao-radar](https://github.com/jiabaobei/xiaozhao-radar)；按招聘平台复用适配器、按届别筛选的思路参考 [career-agent](https://github.com/mengxi111/career-agent)；公开 ATS 接口优先、记录源核验时间的思路参考 [openhire](https://github.com/gzchenhao/openhire)。本项目的 20 个入口来自逐家官方页面核验，未复制这些项目的代码或批量导入其 Seed 数据，也未接入腾讯文档同步。
+
 ## V1 范围
 
 - 只探索输入 URL 所在域名、同一专题目录中的招聘简章、岗位、详情、投递指引等相关页面；最多读取 15 个专题页面，不做全站遍历。

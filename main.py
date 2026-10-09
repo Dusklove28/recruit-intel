@@ -10,6 +10,7 @@ from urllib.parse import urljoin
 
 import requests
 
+from adapters.base import AccessRestricted, HEADERS
 from collectors.campaign import explore_campaign
 from collectors.ccb import collect_ccb_campaign, create_ccb_session, is_ccb_announcement
 from collectors.discovery import Candidate
@@ -24,7 +25,7 @@ from parsers.excel_parser import parse_excel
 from parsers.pdf_parser import parse_pdf
 from processing.evidence import build_field_evidence
 from processing.organization_registry import (
-    lookup_organization, save_verified_organization, verify_central_group,
+    OrganizationMatch, lookup_organization, save_verified_organization, verify_central_group,
 )
 from processing.product_scope import is_product_record
 from storage.database import connect_database, list_records, save_record
@@ -63,6 +64,7 @@ def run(
     source_url: str, settings: Settings | None = None, *,
     verify_online: bool = True, require_verified_identity: bool = True,
     candidate_notice_url: str | None = None,
+    verified_organization: tuple[str, OrganizationMatch] | None = None,
 ) -> RecruitmentRecord:
     ccb_acceptance = is_ccb_announcement(source_url)
     settings = settings or Settings.from_env()
@@ -136,6 +138,8 @@ def run(
     print("LLM抽取成功")
 
     organization = lookup_organization(record.unit_name)
+    if organization is None and verified_organization and record.unit_name == verified_organization[0]:
+        organization = verified_organization[1]
     if organization is None and verify_online and not ccb_acceptance:
         try:
             organization = verify_central_group(record.unit_name)
@@ -164,6 +168,24 @@ def run(
         record_candidate_state(settings, candidate_url, official_url, record, state, reason)
         print("不符合当前可投递成品范围，未进入正式招聘表")
         return record
+    if require_verified_identity and verify_online and not ccb_acceptance and record.application_url:
+        try:
+            with session.get(record.application_url, headers=HEADERS, timeout=(8, 20), stream=True) as response:
+                code = response.status_code
+                if code in {401, 403, 412, 429}:
+                    record_candidate_state(settings, candidate_notice_url or source_url, official_url, record,
+                                           "待核验", f"报名入口公开访问受限（HTTP {code}）")
+                    raise AccessRestricted(record.application_url, code, "报名入口访问受限")
+                if code >= 400:
+                    record_candidate_state(settings, candidate_notice_url or source_url, official_url, record,
+                                           "待核验", f"报名入口无法打开（HTTP {code}）")
+                    return record
+        except AccessRestricted:
+            raise
+        except requests.RequestException as error:
+            record_candidate_state(settings, candidate_notice_url or source_url, official_url, record,
+                                   "待核验", f"报名入口无法打开（{type(error).__name__}）")
+            return record
     with closing(connect_database(settings.database_path)) as database:
         if require_verified_identity and not ccb_acceptance:
             previous = database.execute(

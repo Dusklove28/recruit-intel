@@ -1,0 +1,222 @@
+[
+  {
+    "organization_name": "国家电网有限公司",
+    "organization_type": "央企",
+    "parent_group": "国务院国资委",
+    "career_url": "https://zhaopin.sgcc.com.cn/",
+    "official_domain": "sgcc.com.cn",
+    "platform": "custom",
+    "source": "https://zhaopin.sgcc.com.cn/",
+    "verified_at": null,
+    "enabled": true
+  },
+  {
+    "organization_name": "中国石油化工集团有限公司",
+    "organization_type": "央企",
+    "parent_group": "国务院国资委",
+    "career_url": "https://job.sinopec.com/",
+    "official_domain": "sinopec.com",
+    "platform": "custom",
+    "source": "https://qlsh.sinopec.com/qlsh/careers/rczp/2026/9/I1554810988216188928.shtml",
+    "verified_at": null,
+    "enabled": true
+  },
+  {
+    "organization_name": "中国石油天然气集团有限公司",
+    "organization_type": "央企",
+    "parent_group": "国务院国资委",
+    "career_url": "https://zhaopin.cnpc.com.cn/",
+    "official_domain": "cnpc.com.cn",
+    "platform": "custom",
+    "source": "https://news.cnpc.com.cn/system/2026/09/09/030202503.shtml",
+    "verified_at": null,
+    "enabled": true
+  },
+  {
+    "organization_name": "中国海洋石油集团有限公司",
+    "organization_type": "央企",
+    "parent_group": "国务院国资委",
+    "career_url": "https://www.cnooc.com.cn/zyzx/",
+    "official_domain": "cnooc.com.cn",
+    "platform": "custom",
+    "source": "https://www.cnooc.com.cn/zyzx/",
+    "verified_at": "2026-10-09",
+    "enabled": true
+  },
+  {
+    "organization_name": "国家能源投资集团有限责任公司",
+    "organization_type": "央企",
+    "parent_group": "国务院国资委",
+    "career_url": "https://zhaopin.chnenergy.com.cn/annc/annclist?ggtype=1",
+    "official_domain": "chnenergy.com.cn",
+    "platform": "custom",
+    "source": "https://zhaopin.chnenergy.com.cn/annc/showgg?id=6a152f40-7fe5-460e-ad37-0024acafd8c9",
+    "verified_at": "2026-10-09",
+    "enabled": true
+  },
+  {
+    "organization_name": "中国华能集团有限公司",
+    "organization_type": "央企",
+    "parent_group": "国务院国资委",
+    "career_url": "https://zhaopin.chng.com.cn/home",
+    "official_domain": "chng.com.cn",
+    "platform": "custom",
+    "source": "https://zhaopin.chng.com.cn/home",
+    "verified_at": "2026-10-09",
+    "enabled": true
+  },
+  {
+    "organization_name": "中国华电集团有限公司",
+    "organization_type": "央企",
+    "parent_group": "国务院国资委",
+    "career_url": "https://www.chd.com.cn/site/2/2026-09-14/b7dffff921ca499c90f84509cd272310.html",
+    "official_domain": "chd.com.cn",
+    "platform": "custom",
+    "source": "https://www.chd.com.cn/site/2/2026-09-14/b7dffff921ca499c90f84509cd272310.html",
+    "verified_at": "2026-10-09",
+    "enabled": true
+  },
+  {
+    "organization_name": "中国电力建设集团有限公司",
+    "organization_type": "央企",
+    "parent_group": "国务院国资委",
+    "career_url": "https://zhaopin.powerchina.cn/index",
+    "official_domain": "powerchina.cn",
+    "platform": "custom",
+    "source": "https://sdkf.powerchina.cn/col/col4228/art/2026/art_1559691241.html",
+    "verified_at": "2026-10-09",
+    "enabled": true
+  },
+  {
+    "organization_name": "中国电力工程顾问集团有限公司",
+    "organization_type": "央企子公司",
+    "parent_group": "中国能源建设集团有限公司",
+    "career_url": "http://www.cpecc.ceec.net.cn/art/2026/9/10/art_29215_2523655.html",
+    "official_domain": "ceec.net.cn",
+    "platform": "custom",
+    "source": "http://www.cpecc.ceec.net.cn/art/2026/9/10/art_29215_2523655.html",
+    "verified_at": "2026-10-09",
+    "enabled": true
+  },
+  {
+    "organization_name": "中国能源建设集团财务有限公司",
+    "organization_type": "央企子公司",
+    "parent_group": "中国能源建设集团有限公司",
+    "career_url": "http://www.fc.ceec.net.cn/art/2026/9/7/art_16366_2524928.html",
+    "official_domain": "ceec.net.cn",
+    "platform": "custom",
+    "source": "http://www.fc.ceec.net.cn/art/2026/9/7/art_16366_2524928.html",
+    "verified_at": "2026-10-09",
+    "enabled": true
+  },
+  {
+    "organization_name": "中能建建筑集团有限公司",
+    "organization_type": null,
+    "parent_group": null,
+    "career_url": "http://www.aepc1.ceec.net.cn/art/2026/9/18/art_14574_2525944.html",
+    "official_domain": "ceec.net.cn",
+    "platform": "custom",
+    "source": "http://www.aepc1.ceec.net.cn/art/2026/9/18/art_14574_2525944.html",
+    "verified_at": "2026-10-09",
+    "enabled": true
+  },
+  {
+    "organization_name": "中国电力工程顾问集团中南电力设计院有限公司",
+    "organization_type": "央企子公司",
+    "parent_group": "中国能源建设集团有限公司",
+    "career_url": "http://www.csepdi.ceec.net.cn/art/2026/8/27/art_60749_2527927.html",
+    "official_domain": "ceec.net.cn",
+    "platform": "custom",
+    "source": "http://www.csepdi.ceec.net.cn/art/2026/8/27/art_60749_2527927.html",
+    "verified_at": "2026-10-09",
+    "enabled": true
+  },
+  {
+    "organization_name": "中车长春轨道客车股份有限公司",
+    "organization_type": null,
+    "parent_group": null,
+    "career_url": "https://www.crrcgc.cc/ckgf/128_7635/128_7706/index.html",
+    "official_domain": "crrcgc.cc",
+    "platform": "custom",
+    "source": "https://www.crrcgc.cc/ckgf/2026-08/31/article_2026083119415164821.html",
+    "verified_at": "2026-10-09",
+    "enabled": true
+  },
+  {
+    "organization_name": "中车洛阳机车有限公司",
+    "organization_type": null,
+    "parent_group": null,
+    "career_url": "https://www.crrcgc.cc/ly/26_1362/26_1676/index.html",
+    "official_domain": "crrcgc.cc",
+    "platform": "custom",
+    "source": "https://www.crrcgc.cc/ly/2026-09/04/article_2026090417584944575.html",
+    "verified_at": "2026-10-09",
+    "enabled": true
+  },
+  {
+    "organization_name": "中铁投资集团有限公司",
+    "organization_type": null,
+    "parent_group": null,
+    "career_url": "https://www.crecg.com/zttzjt/rlzy/zpxx/2026100816145396264/index.html",
+    "official_domain": "crecg.com",
+    "platform": "custom",
+    "source": "https://www.crecg.com/zttzjt/rlzy/zpxx/2026100816145396264/index.html",
+    "verified_at": "2026-10-09",
+    "enabled": true
+  },
+  {
+    "organization_name": "中国电子科技集团有限公司",
+    "organization_type": "央企",
+    "parent_group": "国务院国资委",
+    "career_url": "https://www.cetc.com.cn/zgdk/1593022/1592495/index.html",
+    "official_domain": "cetc.com.cn",
+    "platform": "custom",
+    "source": "https://www.cetc.com.cn/zgdk/1593022/1592495/index.html",
+    "verified_at": "2026-10-09",
+    "enabled": true
+  },
+  {
+    "organization_name": "中国移动通信集团有限公司",
+    "organization_type": "央企",
+    "parent_group": "国务院国资委",
+    "career_url": "https://job.10086.cn/touch/personal/campus/index.html",
+    "official_domain": "10086.cn",
+    "platform": "custom",
+    "source": "https://job.10086.cn/touch/personal/campus/index.html",
+    "verified_at": "2026-10-09",
+    "enabled": true
+  },
+  {
+    "organization_name": "中国电信集团有限公司",
+    "organization_type": "央企",
+    "parent_group": "国务院国资委",
+    "career_url": "https://job.chinatelecom.com.cn/wt/TELE/web/index?brandCode=1",
+    "official_domain": "chinatelecom.com.cn",
+    "platform": "custom",
+    "source": "https://www.chinatelecom.com.cn/zp/",
+    "verified_at": "2026-10-09",
+    "enabled": true
+  },
+  {
+    "organization_name": "中国建筑国际集团有限公司",
+    "organization_type": "央企子公司",
+    "parent_group": "中国建筑集团有限公司",
+    "career_url": "https://csci.zhiye.com/",
+    "official_domain": "cscec.com.cn",
+    "platform": "beisen",
+    "source": "https://www.cscec.com.cn/xwzx_new/zqydt_new/202407/3799761.html",
+    "verified_at": "2026-10-09",
+    "enabled": true
+  },
+  {
+    "organization_name": "中粮集团有限公司",
+    "organization_type": "央企",
+    "parent_group": "国务院国资委",
+    "career_url": "https://campus.51job.com/cofco/brochure.html",
+    "official_domain": "51job.com",
+    "platform": "51job_campus",
+    "source": "https://campus.51job.com/cofco/brochure.html",
+    "verified_at": null,
+    "enabled": true
+  }
+]

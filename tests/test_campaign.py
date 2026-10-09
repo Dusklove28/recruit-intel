@@ -48,3 +48,22 @@ def test_plain_text_url_next_to_official_application_instruction():
         "https://jobs.company.example/。", [], [], "",
     )
     assert _application_candidates([page])[0].url == "https://jobs.company.example/"
+
+
+def test_query_keyed_notice_does_not_follow_sibling_campaigns(monkeypatch):
+    import collectors.campaign as campaign
+
+    visited = []
+
+    def fake_fetch(url, session):
+        visited.append(url)
+        return Announcement(
+            url, url, "2027年度高校毕业生招聘公告",
+            [HTMLLink("/annc/showgg?id=other", "2027届其他招聘公告")], [], "",
+        )
+
+    monkeypatch.setattr(campaign, "fetch_announcement", fake_fetch)
+    source = "https://jobs.example.cn/annc/showgg?id=current"
+    bundle = explore_campaign(source, object())
+    assert visited == [source]
+    assert len(bundle.pages) == 1

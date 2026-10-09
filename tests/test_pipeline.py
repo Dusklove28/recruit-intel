@@ -57,7 +57,7 @@ def test_one_url_to_sqlite_and_xlsx_with_attachment(monkeypatch, tmp_path, capsy
         output_path=tmp_path / "data" / "output" / "招聘汇总.xlsx",
     )
 
-    run("https://example.com/notice", settings)
+    run("https://example.com/notice", settings, verify_online=False)
     with connect_database(settings.database_path) as connection:
         records = list_records(connection)
         evidence = json.loads(connection.execute("SELECT field_evidence FROM recruitment").fetchone()[0])

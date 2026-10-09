@@ -8,6 +8,7 @@ from urllib.parse import unquote, urljoin, urlparse
 
 import requests
 
+from adapters.base import HEADERS
 from parsers.html_parser import HTMLLink, parse_html
 
 
@@ -63,7 +64,7 @@ def discover_attachments(base_url: str, links: list[HTMLLink]) -> list[Attachmen
 def fetch_announcement(url: str, session: requests.Session | None = None) -> Announcement:
     _check_http_url(url)
     client = session or requests.Session()
-    response = client.get(url, timeout=REQUEST_TIMEOUT, headers={"User-Agent": "RecruitIntel/0.1"})
+    response = client.get(url, timeout=REQUEST_TIMEOUT, headers=HEADERS)
     response.raise_for_status()
     final_url = response.url
     _check_http_url(final_url)
@@ -92,7 +93,7 @@ def download_attachment(
     destination = destination_dir / f"{digest}_{safe_name}"
     client = session or requests.Session()
     try:
-        with client.get(link.url, timeout=REQUEST_TIMEOUT, stream=True) as response:
+        with client.get(link.url, timeout=REQUEST_TIMEOUT, stream=True, headers=HEADERS) as response:
             response.raise_for_status()
             size = 0
             with destination.open("wb") as output:
